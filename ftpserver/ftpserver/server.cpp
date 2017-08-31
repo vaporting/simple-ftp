@@ -9,6 +9,7 @@ Server::Server(){
 	this->commSock = INVALID_SOCKET;
 	this->mode = Mode::normal;
 	this->root_dir = "ftp/";
+	this->fileSize = 0;
 }
 
 Server::~Server(){
@@ -77,6 +78,10 @@ void Server::processCommand(char* buf, int len){
 	std::string command = std::string(buf, len);
 	if (command.rfind("\r\n") == (command.size() - 2))
 		command = command.substr(0, command.size() - 2);
+	if (command.rfind("\n") == (command.size() - 1))
+		command = command.substr(0, command.size() - 1);
+	if (command.rfind("\r") == (command.size() - 1))
+		command = command.substr(0, command.size() - 1);
 	if (command == "PASV"){
 		this->processPASV();
 	}
@@ -84,6 +89,7 @@ void Server::processCommand(char* buf, int len){
 		this->processRETER(command);
 	}
 	else if (command.find("STOR") == 0){
+		this->processSTOR(command);
 	}
 	else if (command == "QUIT"){
 		this->processQUIT();
@@ -114,7 +120,7 @@ void Server::processRETER(std::string command){
 	int blank = command.find(" ");
 	std::string temp = command.substr(blank+1, command.size() - blank);
 	std::string msg;
-	this->ifile = std::ifstream(this->root_dir + temp, std::ifstream::binary /*| std::ifstream::ate*/);
+	this->ifile = std::ifstream(this->root_dir + temp, std::ifstream::binary);
 	if (ifile){
 		ifile.seekg(0, std::ifstream::end);
 		msg = "SIZE " + std::to_string((int)ifile.tellg()) +"\n";
@@ -125,6 +131,19 @@ void Server::processRETER(std::string command){
 	else
 		msg = "NO File\n";
 	send(ClientSock, msg.c_str(), msg.size(), 0);
+}
+
+void Server::processSTOR(std::string command){
+	int blank = command.find(" ");
+	int blank2 = command.find(" ", blank + 1);
+	std::string filename = command.substr(blank + 1, blank2 - blank - 1);
+	this->file_path = this->root_dir + filename;
+	std::string size = command.substr(blank2 + 1, command.size() - blank2);
+	this->fileSize = std::stoi(size);
+	std::string msg = "OK\n";
+	send(ClientSock, msg.c_str(), msg.size(), 0);
+	this->mode = Mode::upload;
+
 }
 
 void Server::processQUIT(){
@@ -178,6 +197,8 @@ DWORD Server::runComm(){
 			this->mode = Mode::normal;
 		}
 		else if (this->mode == Mode::upload){
+			this->recvfile();
+			this->mode = Mode::normal;
 		
 		}
 		else{
@@ -200,7 +221,20 @@ void Server::sendfile(){
 }
 
 void Server::recvfile(){
-
+	int result = 0;
+	int recvbuflen = DEFAULT_BUFLEN;
+	int total = 0;
+	char recvbuf[DEFAULT_BUFLEN];
+	this->ofile.open(this->file_path, std::ifstream::binary);
+	do{
+		result = recv(commSock, recvbuf, recvbuflen, 0);
+		if (result>0)
+			this->ofile.write(recvbuf, result);
+		total += result;
+		if (total >= this->fileSize)
+			break;
+	} while (result > 0);
+	this->ofile.close();
 }
 
 DWORD WINAPI Server::DataThread(LPVOID p){

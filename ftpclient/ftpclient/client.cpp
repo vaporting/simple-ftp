@@ -50,29 +50,46 @@ void Client::run(){
 	int recvbuflen = DEFAULT_BUFLEN;
 	do{
 		std::getline(std::cin, this->cmd);
-		this->processCommand();
-		result = send(this->cmdSock, this->cmd.c_str(), this->cmd.size(), 0);
-		result = recv(cmdSock, recvbuf, recvbuflen, 0);
-		if (result > 0){ //receive buf
-			for (i = 0; i < result; i++)
-				std::cout << recvbuf[i];
-			this->processMessage(recvbuf, result);
-		}
-		else if (result == 0){
-			std::cout << "client closing\n";
-		}
-		else{
-			printf("recv failed with error: %d\n", WSAGetLastError());
+		if (this->processCommand()){
+			result = send(this->cmdSock, this->cmd.c_str(), this->cmd.size(), 0);
+			result = recv(cmdSock, recvbuf, recvbuflen, 0);
+			if (result > 0){ //receive buf
+				for (i = 0; i < result; i++)
+					std::cout << recvbuf[i];
+				this->processMessage(recvbuf, result);
+			}
+			else if (result == 0){
+				std::cout << "client closing\n";
+			}
+			else{
+				printf("recv failed with error: %d\n", WSAGetLastError());
+			}
 		}
 	} while (result > 0);
 }
 
-void Client::processCommand(){
+bool Client::processCommand(){
 	int blank;
 	if (this->cmd.find("RETER ") == 0){
 		blank = this->cmd.find(" ");
 		this->file_path = this->cmd.substr(blank + 1, this->cmd.size() - 1);
 	}
+	if (this->cmd.find("STOR") == 0){
+		blank = this->cmd.find(" ");
+		this->file_path = this->cmd.substr(blank + 1, this->cmd.size() - 1);
+		this->ifile = std::ifstream(this->file_path, std::ifstream::binary);
+		if (this->ifile){
+			this->ifile.seekg(0, std::ifstream::end);
+			this->cmd += " " + std::to_string((int)(this->ifile.tellg())) + "\n";
+			this->ifile.seekg(0, std::ifstream::beg);
+		}
+		else{
+			std::cout << "no this file" << std::endl;
+			this->ifile.close();
+			return false;
+		}
+	}
+	return true;
 }
 
 void Client::processMessage(char* buf, int len){
@@ -82,7 +99,8 @@ void Client::processMessage(char* buf, int len){
 	}
 	if (message.find("SIZE") == 0 && this->cmd.find("RETER") == 0)
 		this->processRETER(message);
-
+	if (message.find("OK") == 0 && this->cmd.find("STOR") == 0)
+		this->processSTOR();
 }
 
 bool Client::processPASV(std::string &msg){
@@ -106,6 +124,12 @@ bool Client::processRETER(std::string &msg){
 	return true;
 }
 
+bool Client::processSTOR(){
+	this->mode = Mode::upload;
+	return true;
+}
+
+
 bool Client::downloadFile(){
 	int result=0;
 	int recvbuflen = DEFAULT_BUFLEN;
@@ -121,6 +145,19 @@ bool Client::downloadFile(){
 			break;
 	} while (result > 0);
 	this->ofile.close();
+	return true;
+}
+
+bool Client::uploadFile(){
+	int result;
+	char temp[DEFAULT_BUFLEN];
+	while (!this->ifile.eof()){
+		this->ifile.read(temp, DEFAULT_BUFLEN);
+		result = send(this->commSock, temp, this->ifile.gcount(), 0);
+		if (result == SOCKET_ERROR)
+			std::cout << "error\n";
+	}
+	this->ifile.close();
 	return true;
 }
 
@@ -169,6 +206,7 @@ DWORD Client::runComm(){
 			this->mode = Mode::normal;
 		}
 		else if (this->mode == Mode::upload){
+			this->uploadFile();
 			this->mode = Mode::normal;
 		}
 		else{

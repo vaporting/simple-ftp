@@ -28,10 +28,11 @@ public:
 	bool intital(std::string addr);
 	void run();
 private:
-	void processCommand();
+	bool processCommand();
 	void processMessage(char* buf, int len);
 	bool processPASV(std::string &msg);
 	bool processRETER(std::string &msg);
+	bool processSTOR();
 	bool uploadFile();
 	bool downloadFile();
 	bool connectComm(std::string port);
@@ -46,6 +47,7 @@ private:
 	std::string addr;
 	Mode mode;
 	std::ofstream ofile;
+	std::ifstream ifile;
 	std::string file_path;
 	int fileSize;
 	std::string cmd;

@@ -30,7 +30,7 @@ private:
 	void processCommand(char* buf, int len);
 	void processPASV();
 	void processRETER(std::string command);
-	void processSTOR();
+	void processSTOR(std::string command);
 	void processQUIT();
 	void openCommSock();
 	DWORD runComm();
@@ -46,4 +46,6 @@ private:
 	std::string root_dir;
 	std::string file_path;
 	std::ifstream ifile;
+	std::ofstream ofile;
+	int fileSize;
 };
