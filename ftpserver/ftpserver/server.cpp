@@ -217,7 +217,6 @@ void Server::sendfile(){
 		if (result == SOCKET_ERROR)
 			std::cout << "error\n";
 	}
-	this->ifile.close();
 }
 
 void Server::recvfile(){

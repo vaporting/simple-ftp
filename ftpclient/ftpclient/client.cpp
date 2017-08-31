@@ -51,6 +51,7 @@ void Client::run(){
 	do{
 		std::getline(std::cin, this->cmd);
 		if (this->processCommand()){
+			this->cmd += "\n";
 			result = send(this->cmdSock, this->cmd.c_str(), this->cmd.size(), 0);
 			result = recv(cmdSock, recvbuf, recvbuflen, 0);
 			if (result > 0){ //receive buf
@@ -80,7 +81,7 @@ bool Client::processCommand(){
 		this->ifile = std::ifstream(this->file_path, std::ifstream::binary);
 		if (this->ifile){
 			this->ifile.seekg(0, std::ifstream::end);
-			this->cmd += " " + std::to_string((int)(this->ifile.tellg())) + "\n";
+			this->cmd = this->cmd + " " + std::to_string((int)(this->ifile.tellg()));
 			this->ifile.seekg(0, std::ifstream::beg);
 		}
 		else{
